@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Credit Underwriting Decision Engine</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0b0f0e;
+    --surface: #111615;
+    --surface2: #192320;
+    --surface3: #1f2e2a;
+    --border: rgba(255,255,255,0.07);
+    --border-accent: rgba(0,230,160,0.25);
+    --accent: #00e6a0;
+    --accent-dim: rgba(0,230,160,0.12);
+    --text: #e8f2ef;
+    --text2: #7a9490;
+    --text3: #3d5550;
+    --green: #00e6a0;
+    --yellow: #f0c040;
+    --orange: #f07030;
+    --red: #e85050;
+    --approved: #00e6a0;
+    --review: #f0c040;
+    --conditional: #f07030;
+    --rejected: #e85050;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* ─── Header ─── */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 1.1rem;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .header-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border: 1px solid var(--border-accent);
+    padding: 3px 10px;
+    border-radius: 100px;
+    letter-spacing: 0.05em;
+  }
+
+  /* ─── Layout ─── */
+  .main {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 0;
+    min-height: calc(100vh - 57px);
+  }
+
+  /* ─── Input Panel ─── */
+  .input-panel {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 2rem;
+    overflow-y: auto;
+  }
+
+  .panel-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 1.5rem;
+  }
+
+  .form-section {
+    margin-bottom: 1.75rem;
+  }
+
+  .section-label {
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-accent);
+  }
+
+  .field {
+    margin-bottom: 1rem;
+  }
+
+  .field label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text2);
+    margin-bottom: 0.35rem;
+    letter-spacing: 0.02em;
+  }
+
+  .field input, .field select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.85rem;
+    padding: 0.6rem 0.9rem;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+    appearance: none;
+  }
+
+  .field input:focus, .field select:focus {
+    border-color: var(--border-accent);
+    background: var(--surface3);
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .hint {
+    font-size: 0.65rem;
+    color: var(--text3);
+    margin-top: 0.25rem;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .range-wrap {
+    position: relative;
+  }
+
+  .range-value {
+    position: absolute;
+    right: 0;
+    top: -1.4rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--accent);
+  }
+
+  input[type="range"] {
+    width: 100%;
+    height: 4px;
+    background: var(--surface3);
+    border-radius: 4px;
+    appearance: none;
+    outline: none;
+    cursor: pointer;
+    border: none;
+    padding: 0;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(0,230,160,0.4);
+  }
+
+  .presets {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .preset-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 0.5rem;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .preset-btn:hover {
+    border-color: var(--border-accent);
+    background: var(--surface3);
+  }
+
+  .preset-btn .p-name {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--text);
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .preset-btn .p-tag {
+    font-size: 0.6rem;
+    font-family: 'DM Mono', monospace;
+    color: var(--text3);
+  }
+
+  .submit-btn {
+    width: 100%;
+    padding: 0.85rem;
+    background: var(--accent);
+    color: #0b0f0e;
+    border: none;
+    border-radius: 10px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.9rem;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 0.5rem;
+  }
+
+  .submit-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(0,230,160,0.3);
+  }
+
+  .submit-btn:active {
+    transform: translateY(0);
+  }
+
+  /* ─── Results Panel ─── */
+  .results-panel {
+    padding: 2rem;
+    overflow-y: auto;
+  }
+
+  /* ─── Empty State ─── */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 400px;
+    color: var(--text3);
+    text-align: center;
+    gap: 1rem;
+  }
+
+  .empty-icon {
+    width: 64px;
+    height: 64px;
+    border: 2px dashed var(--text3);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+  }
+
+  .empty-state h3 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--text2);
+  }
+
+  .empty-state p {
+    font-size: 0.8rem;
+    max-width: 260px;
+    line-height: 1.6;
+  }
+
+  /* ─── Decision Card ─── */
+  .decision-card {
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    animation: slideIn 0.4s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .decision-header {
+    padding: 1.75rem 2rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .applicant-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+
+  .decision-badge {
+    padding: 0.45rem 1.1rem;
+    border-radius: 100px;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+  }
+
+  .decision-badge.APPROVED { background: rgba(0,230,160,0.15); color: var(--approved); border: 1px solid rgba(0,230,160,0.3); }
+  .decision-badge.REVIEW { background: rgba(240,192,64,0.12); color: var(--review); border: 1px solid rgba(240,192,64,0.3); }
+  .decision-badge.CONDITIONAL { background: rgba(240,112,48,0.12); color: var(--conditional); border: 1px solid rgba(240,112,48,0.3); }
+  .decision-badge.REJECTED { background: rgba(232,80,80,0.12); color: var(--rejected); border: 1px solid rgba(232,80,80,0.3); }
+
+  /* ─── Score Ring ─── */
+  .score-section {
+    padding: 2rem;
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 2rem;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .score-ring-wrap {
+    position: relative;
+    width: 140px;
+    height: 140px;
+    margin: 0 auto;
+  }
+
+  .score-ring-wrap svg {
+    transform: rotate(-90deg);
+  }
+
+  .score-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+
+  .score-number {
+    font-family: 'Syne', sans-serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .score-label {
+    font-size: 0.65rem;
+    color: var(--text3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .score-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .meta-key {
+    font-size: 0.65rem;
+    color: var(--text3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .meta-val {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+
+  .meta-val.accent { color: var(--accent); }
+
+  /* ─── Factors Grid ─── */
+  .factors-section {
+    padding: 1.75rem 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .factors-title {
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    font-family: 'DM Mono', monospace;
+    margin-bottom: 1.25rem;
+  }
+
+  .factor-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .factor-name {
+    width: 165px;
+    font-size: 0.75rem;
+    color: var(--text2);
+    flex-shrink: 0;
+  }
+
+  .factor-bar-track {
+    flex: 1;
+    height: 5px;
+    background: var(--surface3);
+    border-radius: 100px;
+    overflow: hidden;
+  }
+
+  .factor-bar-fill {
+    height: 100%;
+    border-radius: 100px;
+    transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .factor-score {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    width: 30px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .factor-detail {
+    font-size: 0.68rem;
+    color: var(--text3);
+    margin-top: 0.15rem;
+    padding-left: 165px;
+    margin-bottom: 0.5rem;
+  }
+
+  /* ─── Explanation ─── */
+  .explanation-section {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .explanation-box {
+    background: var(--surface2);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    padding: 0.85rem 1rem;
+    font-size: 0.8rem;
+    line-height: 1.7;
+    color: var(--text2);
+  }
+
+  .explanation-box.REJECTED { border-left-color: var(--rejected); }
+  .explanation-box.REVIEW { border-left-color: var(--review); }
+  .explanation-box.CONDITIONAL { border-left-color: var(--conditional); }
+
+  /* ─── Stats Row ─── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+  }
+
+  .stat-cell {
+    padding: 1.25rem 1.5rem;
+    border-right: 1px solid var(--border);
+  }
+
+  .stat-cell:last-child { border-right: none; }
+
+  .stat-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--text3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.35rem;
+  }
+
+  .stat-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  /* ─── History ─── */
+  .history-section {
+    margin-top: 1.5rem;
+  }
+
+  .history-title {
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    font-family: 'DM Mono', monospace;
+    margin-bottom: 1rem;
+  }
+
+  .history-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .history-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .history-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+  }
+
+  .history-card.APPROVED::before { background: var(--approved); }
+  .history-card.REVIEW::before { background: var(--review); }
+  .history-card.CONDITIONAL::before { background: var(--conditional); }
+  .history-card.REJECTED::before { background: var(--rejected); }
+
+  .history-card:hover {
+    border-color: rgba(255,255,255,0.12);
+    transform: translateY(-2px);
+  }
+
+  .hc-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .hc-score {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text3);
+  }
+
+  .hc-decision {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    margin-top: 6px;
+    font-weight: 500;
+  }
+
+  .hc-decision.APPROVED { color: var(--approved); }
+  .hc-decision.REVIEW { color: var(--review); }
+  .hc-decision.CONDITIONAL { color: var(--conditional); }
+  .hc-decision.REJECTED { color: var(--rejected); }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .score-section { grid-template-columns: 1fr; }
+    .factor-detail { padding-left: 0; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">
+    <div class="logo-dot"></div>
+    CreditEngine<span style="color:var(--accent);">AI</span>
+  </div>
+  <div style="display:flex;gap:0.75rem;align-items:center;">
+    <span class="header-badge">UNDERWRITING SIMULATOR</span>
+    <span class="header-badge" style="color:var(--text2);border-color:var(--border);background:transparent;">v2.0</span>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- INPUT PANEL -->
+  <aside class="input-panel">
+    <div class="panel-title">Applicant Profile</div>
+
+    <div class="presets">
+      <button class="preset-btn" onclick="loadPreset('strong')">
+        <span class="p-name">Prime</span>
+        <span class="p-tag">HIGH INCOME</span>
+      </button>
+      <button class="preset-btn" onclick="loadPreset('average')">
+        <span class="p-name">Standard</span>
+        <span class="p-tag">MID RANGE</span>
+      </button>
+      <button class="preset-btn" onclick="loadPreset('weak')">
+        <span class="p-name">Subprime</span>
+        <span class="p-tag">HIGH RISK</span>
+      </button>
+    </div>
+
+    <div class="form-section">
+      <div class="section-label">Identity</div>
+      <div class="field">
+        <label>Applicant Name</label>
+        <input type="text" id="f-name" value="Arjun Sharma" placeholder="Full name">
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="section-label">Financial Profile</div>
+      <div class="field">
+        <label>Annual Income (₹)</label>
+        <input type="number" id="f-income" value="85000" placeholder="e.g. 75000">
+      </div>
+      <div class="field">
+        <label>Credit Score (300–850)</label>
+        <div class="range-wrap">
+          <span class="range-value" id="cs-display">760</span>
+          <input type="range" id="f-credit" min="300" max="850" value="760" oninput="document.getElementById('cs-display').textContent=this.value">
+        </div>
+        <div class="hint">FICO score range · 300 poor → 850 excellent</div>
+      </div>
+      <div class="field">
+        <label>Existing Annual Debt (₹)</label>
+        <input type="number" id="f-debt" value="8000" placeholder="e.g. 12000">
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="section-label">Loan Details</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Loan Amount (₹)</label>
+          <input type="number" id="f-loan" value="25000" placeholder="e.g. 20000">
+        </div>
+        <div class="field">
+          <label>Duration (months)</label>
+          <select id="f-duration">
+            <option value="12">12 mo</option>
+            <option value="24">24 mo</option>
+            <option value="36" selected>36 mo</option>
+            <option value="48">48 mo</option>
+            <option value="60">60 mo</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="section-label">Collateral & Employment</div>
+      <div class="field">
+        <label>Collateral Value (₹, 0 if none)</label>
+        <input type="number" id="f-collateral" value="40000" placeholder="e.g. 50000">
+      </div>
+      <div class="field">
+        <label>Years Employed</label>
+        <div class="range-wrap">
+          <span class="range-value" id="emp-display">7</span>
+          <input type="range" id="f-employment" min="0" max="20" step="0.5" value="7" oninput="document.getElementById('emp-display').textContent=parseFloat(this.value).toFixed(1)">
+        </div>
+      </div>
+    </div>
+
+    <button class="submit-btn" onclick="evaluate()">Run Underwriting Analysis →</button>
+  </aside>
+
+  <!-- RESULTS PANEL -->
+  <main class="results-panel" id="results-panel">
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">⚖</div>
+      <h3>No application evaluated</h3>
+      <p>Fill in the applicant profile and click Run Analysis to see the full underwriting decision.</p>
+    </div>
+    <div id="result-content" style="display:none;"></div>
+    <div id="history-wrap" style="display:none;">
+      <div class="history-section">
+        <div class="history-title">Evaluation History</div>
+        <div class="history-grid" id="history-grid"></div>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<script>
+const PRESETS = {
+  strong: { name: 'Amit Kapoor', income: 150000, credit: 800, debt: 5000, loan: 50000, duration: 24, collateral: 120000, employment: 12 },
+  average: { name: 'Priya Mehta', income: 55000, credit: 695, debt: 12000, loan: 22000, duration: 36, collateral: 20000, employment: 4 },
+  weak: { name: 'Rohit Kumar', income: 22000, credit: 575, debt: 18000, loan: 15000, duration: 60, collateral: 0, employment: 0.5 }
+};
+
+function loadPreset(type) {
+  const p = PRESETS[type];
+  document.getElementById('f-name').value = p.name;
+  document.getElementById('f-income').value = p.income;
+  document.getElementById('f-credit').value = p.credit;
+  document.getElementById('cs-display').textContent = p.credit;
+  document.getElementById('f-debt').value = p.debt;
+  document.getElementById('f-loan').value = p.loan;
+  document.getElementById('f-duration').value = p.duration;
+  document.getElementById('f-collateral').value = p.collateral;
+  document.getElementById('f-employment').value = p.employment;
+  document.getElementById('emp-display').textContent = parseFloat(p.employment).toFixed(1);
+  evaluate();
+}
+
+const history = [];
+
+function evaluate() {
+  const name = document.getElementById('f-name').value.trim() || 'Applicant';
+  const income = parseFloat(document.getElementById('f-income').value) || 0;
+  const credit = parseInt(document.getElementById('f-credit').value);
+  const debt = parseFloat(document.getElementById('f-debt').value) || 0;
+  const loan = parseFloat(document.getElementById('f-loan').value) || 0;
+  const duration = parseInt(document.getElementById('f-duration').value);
+  const collateral = parseFloat(document.getElementById('f-collateral').value) || 0;
+  const employment = parseFloat(document.getElementById('f-employment').value);
+
+  const result = computeRisk({ name, income, credit, debt, loan, duration, collateral, employment });
+
+  history.unshift(result);
+  renderResult(result);
+  renderHistory();
+}
+
+function computeRisk({ name, income, credit, debt, loan, duration, collateral, employment }) {
+  const factors = [];
+
+  // Credit Score
+  let sc, rc;
+  if (credit >= 750) { sc = 10; rc = 'Excellent credit history'; }
+  else if (credit >= 700) { sc = 20; rc = 'Good credit history'; }
+  else if (credit >= 650) { sc = 35; rc = 'Fair credit – moderate risk'; }
+  else { sc = 55; rc = 'Poor credit – high default risk'; }
+  factors.push({ factor: 'Credit Score', score: sc, detail: rc });
+
+  // DTI
+  const monthlyIncome = income / 12;
+  const emi = loan / duration;
+  const totalMonthlyDebt = (debt / 12) + emi;
+  const dti = monthlyIncome > 0 ? totalMonthlyDebt / monthlyIncome : 1;
+  let sd, rd;
+  if (dti <= 0.20) { sd = 5; rd = `Low DTI (${(dti*100).toFixed(1)}%) – excellent repayment capacity`; }
+  else if (dti <= 0.36) { sd = 15; rd = `Moderate DTI (${(dti*100).toFixed(1)}%) – manageable debt load`; }
+  else if (dti <= 0.43) { sd = 25; rd = `High DTI (${(dti*100).toFixed(1)}%) – near repayment limits`; }
+  else { sd = 40; rd = `Critical DTI (${(dti*100).toFixed(1)}%) – exceeds safe threshold`; }
+  factors.push({ factor: 'Debt-to-Income Ratio', score: sd, detail: rd });
+
+  // LTV
+  let sl, rl;
+  if (collateral <= 0) { sl = 20; rl = 'No collateral – unsecured loan'; }
+  else {
+    const ltv = loan / collateral;
+    if (ltv <= 0.60) { sl = 0; rl = `Low LTV (${(ltv*100).toFixed(1)}%) – well-secured`; }
+    else if (ltv <= 0.80) { sl = 10; rl = `Moderate LTV (${(ltv*100).toFixed(1)}%) – adequate collateral`; }
+    else { sl = 20; rl = `High LTV (${(ltv*100).toFixed(1)}%) – under-collateralized`; }
+  }
+  factors.push({ factor: 'Loan-to-Value (Collateral)', score: sl, detail: rl });
+
+  // Employment
+  let se, re;
+  if (employment >= 5) { se = 0; re = 'Stable employment (5+ years)'; }
+  else if (employment >= 2) { se = 10; re = 'Moderate employment stability (2–5 years)'; }
+  else if (employment >= 1) { se = 20; re = 'Limited employment history (1–2 years)'; }
+  else { se = 30; re = 'Insufficient employment history (<1 year)'; }
+  factors.push({ factor: 'Employment Stability', score: se, detail: re });
+
+  // Income adequacy
+  const ratio = income > 0 ? loan / income : 99;
+  let si, ri;
+  if (ratio <= 0.3) { si = 0; ri = 'Loan well within income range'; }
+  else if (ratio <= 0.5) { si = 10; ri = 'Loan moderate relative to income'; }
+  else if (ratio <= 1.0) { si = 20; ri = 'Loan high relative to annual income'; }
+  else { si = 30; ri = 'Loan amount exceeds annual income – high risk'; }
+  factors.push({ factor: 'Income Adequacy', score: si, detail: ri });
+
+  const riskScore = Math.min(sc + sd + sl + se + si, 100);
+
+  let decisionClass, decision;
+  if (riskScore <= 30) { decisionClass = 'APPROVED'; decision = '✅ APPROVED'; }
+  else if (riskScore <= 50) { decisionClass = 'REVIEW'; decision = '🔍 MANUAL REVIEW'; }
+  else if (riskScore <= 65) { decisionClass = 'CONDITIONAL'; decision = '⚠️  CONDITIONAL'; }
+  else { decisionClass = 'REJECTED'; decision = '❌ REJECTED'; }
+
+  // Credit limit
+  const base = income * 0.35;
+  const creditMult = (credit / 850) * 1.5;
+  const riskMod = Math.max(0.1, 1 - riskScore / 150);
+  const creditLimit = Math.round(Math.min(base * creditMult * riskMod, loan * 1.1));
+
+  // Explanation
+  const sorted = [...factors].sort((a, b) => b.score - a.score);
+  let explanation;
+  if (decisionClass === 'APPROVED') explanation = `Application approved. ${sorted[0].detail}.`;
+  else if (decisionClass === 'REVIEW') explanation = `Manual review required. Key concerns: ${sorted[0].detail}; ${sorted[1].detail}.`;
+  else if (decisionClass === 'CONDITIONAL') explanation = `Conditional approval possible with co-signer or reduced amount. Risk factor: ${sorted[0].detail}.`;
+  else explanation = `Application rejected. Primary factors: ${sorted[0].detail}; ${sorted[1].detail}.`;
+
+  return {
+    name, income, credit, debt, loan, duration, collateral, employment,
+    factors, riskScore, decisionClass, decision, creditLimit, dtiPct: (dti * 100).toFixed(1), explanation,
+    timestamp: new Date().toLocaleTimeString()
+  };
+}
+
+function factorColor(score) {
+  if (score <= 10) return '#00e6a0';
+  if (score <= 20) return '#8ee64a';
+  if (score <= 30) return '#f0c040';
+  if (score <= 40) return '#f07030';
+  return '#e85050';
+}
+
+function renderResult(r) {
+  document.getElementById('empty-state').style.display = 'none';
+  const el = document.getElementById('result-content');
+  el.style.display = 'block';
+
+  el.innerHTML = `
+    <div class="decision-card">
+      <div class="decision-header">
+        <div>
+          <div class="applicant-name">${r.name}</div>
+          <div style="font-size:0.7rem;color:var(--text3);font-family:'DM Mono',monospace;margin-top:4px;">Evaluated at ${r.timestamp}</div>
+        </div>
+        <div class="decision-badge ${r.decisionClass}">${r.decision}</div>
+      </div>
+
+      <div class="score-section">
+        <div class="score-ring-wrap">
+          <svg width="140" height="140" viewBox="0 0 140 140">
+            <circle cx="70" cy="70" r="56" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="10"/>
+            <circle cx="70" cy="70" r="56" fill="none"
+              stroke="${factorColor(r.riskScore)}"
+              stroke-width="10"
+              stroke-linecap="round"
+              stroke-dasharray="${2 * Math.PI * 56}"
+              stroke-dashoffset="${2 * Math.PI * 56 * (1 - r.riskScore / 100)}"
+              style="transition: stroke-dashoffset 1s cubic-bezier(0.16,1,0.3,1);"/>
+          </svg>
+          <div class="score-center">
+            <div class="score-number" style="color:${factorColor(r.riskScore)}">${r.riskScore}</div>
+            <div class="score-label">Risk Score</div>
+          </div>
+        </div>
+        <div class="score-meta">
+          <div class="meta-item">
+            <div class="meta-key">Recommended Limit</div>
+            <div class="meta-val accent">₹${r.creditLimit.toLocaleString('en-IN')}</div>
+          </div>
+          <div class="meta-item">
+            <div class="meta-key">DTI Ratio</div>
+            <div class="meta-val" style="color:${parseFloat(r.dtiPct)>43?'var(--rejected)':parseFloat(r.dtiPct)>36?'var(--conditional)':'var(--text)'}">${r.dtiPct}%</div>
+          </div>
+          <div class="meta-item">
+            <div class="meta-key">Loan / Income Ratio</div>
+            <div class="meta-val">${((r.loan/r.income)*100).toFixed(1)}%</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="factors-section">
+        <div class="factors-title">Risk Factor Breakdown</div>
+        ${r.factors.map(f => `
+          <div class="factor-row">
+            <div class="factor-name">${f.factor}</div>
+            <div class="factor-bar-track">
+              <div class="factor-bar-fill" style="width:${f.score}%;background:${factorColor(f.score)};"></div>
+            </div>
+            <div class="factor-score" style="color:${factorColor(f.score)}">${f.score}</div>
+          </div>
+          <div class="factor-detail">${f.detail}</div>
+        `).join('')}
+      </div>
+
+      <div class="explanation-section">
+        <div class="factors-title">Underwriter Explanation</div>
+        <div class="explanation-box ${r.decisionClass}">${r.explanation}</div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-cell">
+          <div class="stat-label">Annual Income</div>
+          <div class="stat-value">₹${r.income.toLocaleString('en-IN')}</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">Loan Requested</div>
+          <div class="stat-value">₹${r.loan.toLocaleString('en-IN')}</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">Credit Score</div>
+          <div class="stat-value">${r.credit}</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">Employment</div>
+          <div class="stat-value">${r.employment}y</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderHistory() {
+  if (history.length < 2) return;
+  const wrap = document.getElementById('history-wrap');
+  const grid = document.getElementById('history-grid');
+  wrap.style.display = 'block';
+  grid.innerHTML = history.slice(1).map(r => `
+    <div class="history-card ${r.decisionClass}" onclick="showHistory(${history.indexOf(r)})">
+      <div class="hc-name">${r.name}</div>
+      <div class="hc-score">Risk ${r.riskScore}/100 · DTI ${r.dtiPct}%</div>
+      <div class="hc-decision ${r.decisionClass}">${r.decision}</div>
+    </div>
+  `).join('');
+}
+
+function showHistory(idx) {
+  renderResult(history[idx]);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Run on load with default values
+window.addEventListener('load', () => evaluate());
+</script>
+</body>
+</html>
